@@ -1,9 +1,9 @@
 name: Publish release to TestPyPI & PyPI
 on:
+  # Triggers the workflow on push or pull request events but only for the main branch
   push:
-    branches:
-      - 'main'
-      - 'dev'
+    branches: [ main, dev ]
+
 jobs:
   build-and-publish:
     name: Build and publish to PyPI
