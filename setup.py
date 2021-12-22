@@ -8,7 +8,7 @@ def read(fname):
 
 setup(
     name='karoosync',
-    version='1.1.0',
+    version='1.2.0',
     description='Syncs workouts from intervals.icu to Hammerhead Karoo',
     long_description=read('README.md'),
     long_description_content_type='text/markdown',
