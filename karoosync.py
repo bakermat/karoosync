@@ -109,14 +109,15 @@ def convert_zwo(zwo_xml, date):
                 "type": "percent-ftp",
                 "value": power
             },
-            "secondaryTarget": {
-                "type": "cadence",
-                "value": cadence
-            },
             "type": "step"
         }
         list_structure.append(structure)
-
+        if cadence is not None:
+            structure['secondaryTarget'] = {
+                "type": "cadence",
+                "value": cadence
+            }
+        cadence = None
     dict_structure = {
         "name": name,
         "source": "N/A",
