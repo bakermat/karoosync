@@ -1,11 +1,5 @@
 name: Publish release to TestPyPI & PyPI
-on:
-  # Triggers the workflow on push or pull request events but only for the main branch
-  push:
-    branches:
-      - main
-      - dev
-
+on: push
 jobs:
   build-and-publish:
     name: Build and publish to PyPI
@@ -21,7 +15,7 @@ jobs:
     - name: Build a binary wheel and a source tarball
       run: python -m build --sdist --wheel --outdir dist/ .
     - name: Publish distribution to Test PyPI
-      if: startsWith(github.ref, 'refs/heads/dev')
+      if: endsWith(github.ref, 'dev')
       uses: pypa/gh-action-pypi-publish@master
       with:
         password: ${{ secrets.TEST_PYPI_API_TOKEN }}
