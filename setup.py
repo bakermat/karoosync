@@ -8,7 +8,7 @@ def read(fname):
 
 setup(
     name='karoosync',
-    version='1.4.0-dev1',
+    version='1.4.0-dev2',
     description='Syncs workouts from intervals.icu to Hammerhead Karoo',
     long_description=read('README.md'),
     long_description_content_type='text/markdown',
@@ -19,9 +19,7 @@ setup(
     py_modules=['karoosync'],
     install_requires=[
         'requests>=2.26',
-        'PyJWT',
-        'bs4',
-        'lxml'
+        'PyJWT'
     ],
     entry_points={
         'console_scripts': [

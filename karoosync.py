@@ -1,16 +1,13 @@
 import configparser
-import json
 import jwt
 import requests
 import os
 import sys
 import re
 from base64 import b64encode
-from bs4 import BeautifulSoup
-from datetime import datetime
 
 
-def write_configfile(config, filename):
+def write_configfile(filename):
     text = r"""
 [INTERVALS.ICU]
 INTERVALS_ICU_ID = i00000
@@ -119,7 +116,7 @@ def main():
             print(f'Could not read {CONFIGFILE}. Please check again.')
             sys.exit(1)
     else:
-        write_configfile(config, CONFIGFILE)
+        write_configfile(CONFIGFILE)
 
     # Get Hammerhead dashboard access token
     token = get_access_token(HAMMERHEAD_USERNAME, HAMMERHEAD_PASSWORD)
