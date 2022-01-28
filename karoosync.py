@@ -4,6 +4,7 @@ import jwt
 import requests
 import os
 import sys
+import re
 from base64 import b64encode
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -14,6 +15,8 @@ def write_configfile(config, filename):
 [INTERVALS.ICU]
 INTERVALS_ICU_ID = i00000
 INTERVALS_ICU_APIKEY = 00000000000000000000
+WORKOUT_OLDEST_DATE = 2022-01-01
+WORKOUT_NEWEST_DATE = 2022-12-31
 
 [HAMMERHEAD]
 HAMMERHEAD_USERNAME = your_email_address
@@ -46,20 +49,24 @@ def get_userid(token):
 
 def get_workouts(oldest, newest, user_id, api_key):
     url = f'https://intervals.icu/api/v1/athlete/{user_id}/events?oldest={oldest}&newest={newest}'
-
+    
     token = b64encode(f'API_KEY:{api_key}'.encode()).decode()
     headers = {
         'Authorization': f'Basic {token}',
         'Content-Type': 'text/plain'
     }
     workouts = call_api(url, "GET", headers).json()
+
+    list_workouts = []
     for workout in workouts:
-        if workout['type'] == "Ride" and workout['start_date_local'][0:10] == newest:
+        if workout['type'] == 'Ride':
             workout_id = workout['id']
             date = workout['start_date_local'][0:10]
-            json_workout = {'id': workout_id, 'date': date}
+            name = workout['name']
+            json_workout = {'id': workout_id, 'date': date, 'name': name}
+            list_workouts.append(json_workout)
 
-    return json_workout
+    return list_workouts
 
 
 def get_workout(workout_id, user_id, api_key):
@@ -74,86 +81,40 @@ def get_workout(workout_id, user_id, api_key):
     return response.text
 
 
-def call_api(url, method, headers, payload=None):
+def call_api(url, method, headers, payload=None, files=None):
     try:
-        response = requests.request(method, url, headers=headers, data=payload)
+        response = requests.request(method, url, headers=headers, data=payload, files=files)
         response.raise_for_status()
-    except requests.exceptions.HTTPError:
-        print("User credentials not valid. Please correct and try again.")
+    except requests.exceptions.HTTPError as err:
+        print(f'Something went wrong: {response.text}')
         sys.exit(1)
     return response
-
-
-def convert_zwo(zwo_xml, date):
-    bs_data = BeautifulSoup(zwo_xml, "xml")
-    steps = bs_data.find_all('SteadyState')
-    # Get name from ZWO file, if no name just name it "Workout"
-    name = bs_data.find('name').get_text() or 'Workout'
-
-    list_structure = []
-    power = None
-    cadence = None
-
-    for step in steps:
-        duration = int(step.get('Duration'))
-        if step.get('Power'):
-            power = int(float(step.get('Power')) * 100)
-        if step.get('Cadence'):
-            cadence = int(step.get('Cadence'))
-
-        structure = {
-            "class": "active",
-            "length": duration,
-            "lengthType": "seconds",
-            "primaryTarget": {
-                "type": "percent-ftp",
-                "value": power
-            },
-            "type": "step"
-        }
-        list_structure.append(structure)
-        if cadence is not None:
-            structure['secondaryTarget'] = {
-                "type": "cadence",
-                "value": cadence
-            }
-        cadence = None
-    dict_structure = {
-        "name": name,
-        "source": "N/A",
-        "structure": list_structure,
-        "plannedDate": date
-    }
-
-    return dict_structure
 
 
 def upload_workout(user, token, workout):
     url = f"https://dashboard.hammerhead.io/v1/users/{user}/workouts/import/file"
     headers = {
-        'Authorization': f'Bearer {token}',
-        'Content-Type': 'application/json'
+        'Authorization': f'Bearer {token}'
     }
-    response = call_api(url, "POST", headers=headers, payload=json.dumps(workout))
+    response = call_api(url, "POST", headers=headers, files=workout)
     return response
 
 
 def main():
     # Read config file
     CONFIGFILE = 'karoosync.cfg'
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(interpolation=None)
 
     config_exists = os.path.exists(CONFIGFILE)
     if config_exists:
         try:
             config.read(CONFIGFILE)
+            WORKOUT_OLDEST_DATE = config['INTERVALS.ICU']['WORKOUT_OLDEST_DATE']
+            WORKOUT_NEWEST_DATE = config['INTERVALS.ICU']['WORKOUT_NEWEST_DATE']
             INTERVALS_ICU_ID = config['INTERVALS.ICU']['INTERVALS_ICU_ID']
             INTERVALS_ICU_APIKEY = config['INTERVALS.ICU']['INTERVALS_ICU_APIKEY']
             HAMMERHEAD_USERNAME = config['HAMMERHEAD']['HAMMERHEAD_USERNAME']
             HAMMERHEAD_PASSWORD = config['HAMMERHEAD']['HAMMERHEAD_PASSWORD']
-            # Set date to today. Might add as option in future if it makes sense.
-            WORKOUT_OLDEST_DATE = datetime.today().strftime('%Y-%m-%d')
-            WORKOUT_NEWEST_DATE = datetime.today().strftime('%Y-%m-%d')
         except KeyError:
             print(f'Could not read {CONFIGFILE}. Please check again.')
             sys.exit(1)
@@ -167,20 +128,34 @@ def main():
     user = get_userid(token)
 
     # Get list of all workouts between these dates, default = only today
-    workout = get_workouts(WORKOUT_OLDEST_DATE, WORKOUT_NEWEST_DATE, INTERVALS_ICU_ID, INTERVALS_ICU_APIKEY)
-    workout_id = workout['id']
-    workout_date = workout['date']
+    workouts = get_workouts(WORKOUT_OLDEST_DATE, WORKOUT_NEWEST_DATE, INTERVALS_ICU_ID, INTERVALS_ICU_APIKEY)
+    if workouts:
+        for workout in workouts:
+            workout_id = workout['id']
+            workout_date = workout['date']
+            workout_name = workout['name']
+            # Remove invalid filename characters
+            workout_name_clean =re.sub(r'[<>:/\|?*"]+',"", workout_name)
+            filename = f"./zwo/{workout_date}_{workout_name_clean}.zwo"
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
 
-    # Get ZWO file for selected workout
-    workout_zwo = get_workout(workout_id, INTERVALS_ICU_ID, INTERVALS_ICU_APIKEY)
+            # Get ZWO file for selected workout
+            workout_zwo = get_workout(workout_id, INTERVALS_ICU_ID, INTERVALS_ICU_APIKEY)
 
-    # Convert ZWO file to Hammerhead JSON
-    workout_hammerhead = convert_zwo(workout_zwo, workout_date)
+            with open(filename,'w') as f:
+                f.write(workout_zwo)
+                f.close()
 
-    # Upload to Hammerhead
-    response = upload_workout(user, token, workout_hammerhead)
-    print(f'Successfully created workout {response.text.strip()}\nYou should see this workout on your Karoo device now if you are in the Workouts menu. Re-run this script if you are not, as a manual or automatic sync will delete this workout again.')
+            files = {'file': open(filename, 'rb')}
 
+            # Upload to Hammerhead
+            upload_workout(user, token, files)
+            print(f'Synced {workout_date}: {workout_name}')
 
+    else:
+        print('No workouts found.')
+        sys.exit(0)
+
+    
 if __name__ == "__main__":
     main()
