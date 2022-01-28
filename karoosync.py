@@ -12,6 +12,7 @@ def write_configfile(filename):
 [INTERVALS.ICU]
 INTERVALS_ICU_ID = i00000
 INTERVALS_ICU_APIKEY = 00000000000000000000
+# Date or date range of intervals you want to upload to your Karoo device
 WORKOUT_OLDEST_DATE = 2022-01-01
 WORKOUT_NEWEST_DATE = 2022-12-31
 
