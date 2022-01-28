@@ -129,7 +129,7 @@ def convert_zwo(zwo_xml, date):
 
 
 def upload_workout(user, token, workout):
-    url = f"https://dashboard.hammerhead.io/v1/users/{user}/workouts"
+    url = f"https://dashboard.hammerhead.io/v1/users/{user}/workouts/import/file"
     headers = {
         'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json'
